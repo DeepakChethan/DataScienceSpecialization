@@ -1,0 +1,155 @@
+---
+title: "NOAA Storm database analysis for determining events which have greatest impacts on health and financials"
+author: "Deepak Chethan"
+date: "April 22, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+Storms and other severe weather events can cause both public health and economic problems for communities and municipalities. Many severe events can result in fatalities, injuries, and property damage, and preventing such outcomes to the extent possible is a key concern.
+
+This project involves exploring the U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database. This database tracks characteristics of major storms and weather events in the United States, including when and where they occur, as well as estimates of any fatalities, injuries, and property damage.
+
+## Synopsis
+After analizing the provided data. We could come to the conclusion that tornadoes are the most dangerous weather event to the population health. Following tornadoes was excessive heat. Their economic impact was also analyzed. Flash floods and thunderstorm winds caused billions of dollars worth of damage. The most damanging events were droughts, floods and hailing.
+
+## Loading the data
+
+```{r results="hide"}
+library("R.utils")
+library("ggplot2")
+stormData <- read.csv("repdata_data_StormData.csv")
+```
+
+## Data Summary 
+
+Summary statistics for the given data set!
+
+```{r}
+summary(stormData)
+```
+
+## Preprocessing of the data
+
+```{r}
+# Gather only required data
+stormEvent <- stormData[, c("BGN_DATE", "EVTYPE", "FATALITIES", "INJURIES", 
+    "PROPDMG", "PROPDMGEXP", "CROPDMG", "CROPDMGEXP")]
+
+# Select data for Fatalities and injuries
+eventHealth <- subset(stormEvent, !stormEvent$FATALITIES == 0 & !stormEvent$INJURIES == 
+    0, select = c(EVTYPE, FATALITIES, INJURIES))
+
+# Select data for Property Damage and Crop Damage
+eventEconomic <- subset(stormEvent, !stormEvent$PROPDMG == 0 & !stormEvent$CROPDMG == 
+    0, select = c(EVTYPE, PROPDMG, PROPDMGEXP, CROPDMG, CROPDMGEXP))
+```
+
+
+## Question 1
+
+Data extraction required for answering the question 1
+
+```{r}
+# Create separate data set for Injury and Fatalities Fatalities
+eventHealth_Death <- aggregate(eventHealth$FATALITIES, by = list(eventHealth$EVTYPE), 
+    FUN = sum)
+# Give proper name for columns
+colnames(eventHealth_Death) <- c("EVENTTYPE", "FATALITIES")
+
+# Injury
+eventHealth_Inj <- aggregate(eventHealth$INJURIES, by = list(eventHealth$EVTYPE), 
+    FUN = sum)
+# Give column name
+colnames(eventHealth_Inj) <- c("EVENTTYPE", "INJURIES")
+
+# Let's reorder 2 dataset and filter top 5 events for both dataset
+eventHealth_Death <- eventHealth_Death[order(eventHealth_Death$FATALITIES, decreasing = TRUE), 
+    ][1:5, ]
+
+eventHealth_Inj <- eventHealth_Inj[order(eventHealth_Inj$INJURIES, decreasing = TRUE), 
+    ][1:5, ]
+```
+
+## Results:
+
+### Graph for weather events causing fatalities
+
+```{r}
+ ggplot() + geom_bar(data = eventHealth_Death, aes(x = EVENTTYPE, 
+    y = FATALITIES, fill = interaction(FATALITIES, EVENTTYPE)), stat = "identity", 
+    show.legend = F) + theme(axis.text.x = element_text(angle = 30, hjust = 1)) + 
+    xlab("Harmful Events") + ylab("No. of fatailities") + ggtitle("Top 5 weather events causing fatalities") + 
+    theme(axis.text.x = element_text(angle = 30, hjust = 1))
+```
+
+
+### Graph for weather events causing injuries
+
+```{r}
+# Plot injuries and store at variable Inj_plot
+ ggplot() + geom_bar(data = eventHealth_Inj, aes(x = EVENTTYPE, y = INJURIES, 
+    fill = interaction(INJURIES, EVENTTYPE)), stat = "identity", show.legend = F) + 
+    theme(axis.text.x = element_text(angle = 30, hjust = 1)) + xlab("Harmful Events") + 
+    ylab("No. of Injuries") + ggtitle("Top 5 weather events causing Injuries") + 
+    theme(axis.text.x = element_text(angle = 30, hjust = 1))
+
+```
+
+This graph indicates that the Tornado is the most harmful event!
+
+## Question 2
+
+Data Extraction for answering the second question:
+
+```{r}
+eventEconomic <- subset(eventEconomic, eventEconomic$PROPDMGEXP == "K" | eventEconomic$PROPDMGEXP == 
+    "k" | eventEconomic$PROPDMGEXP == "M" | eventEconomic$PROPDMGEXP == "m" | 
+    eventEconomic$PROPDMGEXP == "B" | eventEconomic$PROPDMGEXP == "b")
+
+eventEconomic <- subset(eventEconomic, eventEconomic$CROPDMGEXP == "K" | eventEconomic$CROPDMGEXP == 
+    "k" | eventEconomic$CROPDMGEXP == "M" | eventEconomic$CROPDMGEXP == "m" | 
+    eventEconomic$CROPDMGEXP == "B" | eventEconomic$CROPDMGEXP == "b")
+
+# Convert ecnomic values to number
+eventEconomic$PROPDMGEXP <- gsub("m", 1e+06, eventEconomic$PROPDMGEXP, ignore.case = TRUE)
+eventEconomic$PROPDMGEXP <- gsub("k", 1000, eventEconomic$PROPDMGEXP, ignore.case = TRUE)
+eventEconomic$PROPDMGEXP <- gsub("b", 1e+09, eventEconomic$PROPDMGEXP, ignore.case = TRUE)
+eventEconomic$PROPDMGEXP <- as.numeric(eventEconomic$PROPDMGEXP)
+eventEconomic$CROPDMGEXP <- gsub("m", 1e+06, eventEconomic$CROPDMGEXP, ignore.case = TRUE)
+eventEconomic$CROPDMGEXP <- gsub("k", 1000, eventEconomic$CROPDMGEXP, ignore.case = TRUE)
+eventEconomic$CROPDMGEXP <- gsub("b", 1e+09, eventEconomic$CROPDMGEXP, ignore.case = TRUE)
+eventEconomic$CROPDMGEXP <- as.numeric(eventEconomic$CROPDMGEXP)
+eventEconomic$PROPDMGEXP <- as.numeric(eventEconomic$PROPDMGEXP)
+
+# then sum the damages by each event type
+eventEconomic$TOTALDMG <- (eventEconomic$CROPDMG * eventEconomic$CROPDMGEXP) + 
+    (eventEconomic$PROPDMG * eventEconomic$PROPDMGEXP)
+
+eventEconomic <- aggregate(eventEconomic$TOTALDMG, by = list(eventEconomic$EVTYPE), 
+    FUN = sum)
+
+colnames(eventEconomic) <- c("EVTYPE", "TOTALDMG")
+
+# Rank the event type by highest damage cost and take top 5 columns
+eventEconomic <- eventEconomic[order(eventEconomic$TOTALDMG, decreasing = TRUE), 
+    ]
+eventEconomic <- eventEconomic[1:5, ]
+```
+
+## Results:
+
+```{r}
+ggplot() + geom_bar(data = eventEconomic, aes(x = EVTYPE, y = TOTALDMG, fill = interaction(TOTALDMG, 
+    EVTYPE)), stat = "identity", show.legend = F) + theme(axis.text.x = element_text(angle = 30, 
+    hjust = 1)) + xlab("Event Type") + ylab("Total Damage")
+```
+
+This graph indicates that the flood is most harmful financially.
+
+## Summary
+From the above analysis, we could say that Tornado is the most dangerous and Flood has most economic consequence.
